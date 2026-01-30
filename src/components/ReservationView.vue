@@ -47,24 +47,26 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { Resource, TimeSlot } from '@/types/reservation'
 import axios from 'axios'
 import { onMounted, ref } from 'vue'
 
-const resources = ref([])
-const timeslots = ref([])
-const selectedResource = ref(null)
-const selectedSlot = ref(null)
-const email = ref('')
-const showModal = ref(false)
-const userEmail = ref('user@naver.com')
 
-const openPaymentModal = (slot) => {
+const resources = ref<Resource[]>([])
+const timeslots = ref<TimeSlot[]>([])
+const selectedResource = ref<Resource | null>(null)
+const selectedSlot = ref<TimeSlot | null>(null)
+const email = ref<string>('')
+const showModal = ref<boolean>(false)
+const userEmail = ref<string>('user@naver.com')
+
+const openPaymentModal = (slot: TimeSlot) => {
   selectedSlot.value = slot;
   showModal.value = true;
 };
 
-const getStatusText = (status) => {
+const getStatusText = (status: string) => {
   if (status === 'AVAILABLE') return '예약 가능';
   if (status === 'HOLD') return '결제 중';
   return '예약 완료';
@@ -78,44 +80,47 @@ const fetchResources = async () => {
   console.log('데이터 로드 성공:', resources.value)
 }
 
-const fetchTimeSlots = async (resource) => {
+const fetchTimeSlots = async (resource: Resource) => {
   selectedResource.value = resource
 
-  const res = await axios.get('/api/timeslots', {
-    params: {
-      resourceId: resource.id,
-    },
-  })
-  timeslots.value = res.data
-  console.log(timeslots.value)
-
-  // timeslots.value.forEach((item) => {
-  //   console.log(formatDate(item.startTime))
-  //   console.log(formatTime(item.startTime))
-  // })
-
-  console.log('데이터 로드 성공:', timeslots.value)
-}
-
-const reserve = async (slotId) => {
   try {
-    const res = await axios.post('/api/reservations', {
-      timeSlotId: slotId,
-      userEmail: userEmail.value,
+    const res = await axios.get('/api/timeslots', {
+      params: {
+        resourceId: resource.id,
+      },
     })
+    timeslots.value = res.data
+    console.log('데이터 로드 성공:', timeslots.value)
 
-    console.log(res.status)
-    console.log(res.message)
-    alert('예약이 완료되었습니다.')
-  } catch (err) {
-    alert('예약 실패: ' + err.response.data.message)
-  } finally {
-    fetchTimeSlots()
+  } catch (error) {
+    console.error('시간대 로드 실패:', error)
   }
 }
 
+const confirmReservation = async () => {
+  if (!selectedSlot.value) return;
+
+  try {
+    // 1단계: 예약 생성 (HOLD 상태 유도)
+    const res = await axios.post('/api/reservations', {
+      timeSlotId: selectedSlot.value.id,
+      userEmail: email.value || userEmail.value,
+    });
+
+    alert('예약(결제 대기)이 생성되었습니다.');
+    showModal.value = false;
+
+    // 이후 결제 로직으로 이동하거나 목록 새로고침
+    if (selectedResource.value) {
+      await fetchTimeSlots(selectedResource.value);
+    }
+  } catch (err: any) {
+    alert('예약 실패: ' + (err.response?.data?.message || '알 수 없는 오류'));
+  }
+};
+
 //시간만 추출 (예: 2024-05-20 09:00:00)
-const formatTime = (dateTimeString) => {
+const formatTime = (dateTimeString?: string) => {
   if (!dateTimeString) return ''
   const date = new Date(dateTimeString)
   return date.toLocaleTimeString('ko-KR', {
@@ -126,7 +131,7 @@ const formatTime = (dateTimeString) => {
 }
 
 //날짜만 추출 (예: 2024-05-20 09:00:00 -> 2024년 05월 20일)
-const formatDate = (dateTimeString) => {
+const formatDate = (dateTimeString?: string) => {
   if (!dateTimeString) return ''
   const date = new Date(dateTimeString)
   return date.toLocaleDateString('ko-KR', {

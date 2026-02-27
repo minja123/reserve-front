@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import ReservationView from './components/ReservationView.vue';
 </script>
 
 <template>
-  <ReservationView />
+  <router-view />
 </template>
 
 <style scoped></style>
